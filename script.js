@@ -1,25 +1,39 @@
-// CONFIGURE A SENHA AQUI
+// ============================================
+        // CONFIGURAÇÃO - MUDE AQUI A URL DA SUA API
+        // ============================================
+        const API_URL = 'https://api.jsonbin.io/v3/b/691d1b4fd0ea881f40f127f7';
+        const API_KEY = '$2a$10$dVCsZ8kBw6znrqEZB9tuc.cgV1LErI3N4OegnOWyVyBDO03ZAzIDC'; 
         const SENHA_CORRETA = "GABI_E_PEDRO";
+
+        // ============================================
+        // SISTEMA DE AUTENTICAÇÃO
+        // ============================================
         
-        // Sistema de autenticação
         function checkPassword() {
             const input = document.getElementById('passwordInput');
             const senha = input.value;
             
             if (senha === SENHA_CORRETA) {
-                // Salva login no sessionStorage
                 sessionStorage.setItem('authenticated', 'true');
                 showApp();
             } else {
-                // Mostra erro
                 document.getElementById('loginError').classList.add('show');
                 input.value = '';
                 input.focus();
                 
-                // Remove erro após 3 segundos
                 setTimeout(() => {
                     document.getElementById('loginError').classList.remove('show');
                 }, 3000);
+            }
+        }
+
+        function logout() {
+            if (confirm('Deseja realmente sair?')) {
+                sessionStorage.removeItem('authenticated');
+                document.getElementById('appScreen').classList.remove('active');
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('passwordInput').value = '';
+                document.getElementById('passwordInput').focus();
             }
         }
 
@@ -29,66 +43,107 @@
             loadData();
         }
 
-        // Verifica se já está autenticado ao carregar a página
         window.addEventListener('DOMContentLoaded', () => {
             const isAuthenticated = sessionStorage.getItem('authenticated');
             if (isAuthenticated === 'true') {
                 showApp();
             } else {
-                // Foca no input de senha
                 document.getElementById('passwordInput').focus();
             }
         });
 
-        // Permite pressionar Enter para fazer login
         document.getElementById('passwordInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') checkPassword();
         });
 
-        // Resto do código do app
+        // ============================================
+        // SISTEMA DE BANCO DE DADOS
+        // ============================================
+
         let data = {
             person1: { name: 'Pedro', total: 0, history: [] },
             person2: { name: 'Gabi', total: 0, history: [] }
         };
 
-        // Sistema de armazenamento usando arquivo JSON via API Claude
+        let isOnline = false;
+
         async function loadData() {
             try {
                 // Tenta carregar do localStorage primeiro (cache)
-                const cached = localStorage.getItem('piggybank_cache');
+                const cached = localStorage.getItem('cofrinho_cache');
                 if (cached) {
                     data = JSON.parse(cached);
                     updateDisplay();
                 }
 
-                // Carrega do armazenamento permanente
-                const result = await window.storage.get('piggybank_permanent', true);
-                if (result && result.value) {
-                    data = JSON.parse(result.value);
-                    localStorage.setItem('piggybank_cache', result.value);
+                // Tenta carregar do banco de dados online
+                const response = await fetch(API_URL + '/latest', {
+                    method: 'GET',
+                    headers: {
+                        'X-Master-Key': API_KEY
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    data = result.record;
+                    localStorage.setItem('cofrinho_cache', JSON.stringify(data));
+                    isOnline = true;
+                    updateDBStatus('online');
+                } else {
+                    isOnline = false;
+                    updateDBStatus('offline');
                 }
             } catch (error) {
-                console.log('Primeira vez usando o cofrinho ou erro ao carregar!');
+                console.log('Usando dados locais');
+                isOnline = false;
+                updateDBStatus('offline');
             }
             updateDisplay();
         }
 
         async function saveData() {
+            // Salva no localStorage imediatamente
+            localStorage.setItem('cofrinho_cache', JSON.stringify(data));
+
+            // Tenta salvar online
             try {
-                const jsonData = JSON.stringify(data);
-                
-                // Salva no localStorage como cache
-                localStorage.setItem('piggybank_cache', jsonData);
-                
-                // Salva no armazenamento permanente compartilhado (sem verificação de erro)
-                await window.storage.set('piggybank_permanent', jsonData, true).catch(() => {
-                    // Ignora erro silenciosamente, pois o localStorage já salvou
+                const response = await fetch(API_URL, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(data)
                 });
+
+                if (response.ok) {
+                    isOnline = true;
+                    updateDBStatus('online');
+                } else {
+                    isOnline = false;
+                    updateDBStatus('offline');
+                }
             } catch (error) {
-                // Ignora erro silenciosamente
-                console.log('Dados salvos no cache local');
+                isOnline = false;
+                updateDBStatus('offline');
             }
         }
+
+        function updateDBStatus(status) {
+            const statusEl = document.getElementById('dbStatus');
+            if (status === 'online') {
+                statusEl.className = 'db-status online';
+                statusEl.textContent = '✓ Conectado - Dados sincronizados';
+            } else {
+                statusEl.className = 'db-status offline';
+                statusEl.textContent = '⚠ Modo offline - Dados salvos localmente';
+            }
+        }
+
+        // ============================================
+        // FUNÇÕES DO APP
+        // ============================================
 
         function formatCurrency(value) {
             return `R$ ${value.toFixed(2).replace('.', ',')}`;
@@ -105,17 +160,21 @@
             });
         }
 
-        function addValue(person) {
+        async function addValue(person) {
             const input = document.getElementById(`${person}Input`);
+            const btn = document.getElementById(person === 'person1' ? 'addBtn1' : 'addBtn2');
             const value = parseFloat(input.value);
 
             if (isNaN(value) || value <= 0) {
-                alert('Por favor, insira um valor válido!');
+                showErrorFeedback('Por favor, insira um valor válido!');
                 return;
             }
 
+            // Desabilita botão durante salvamento
+            btn.disabled = true;
+
             const entry = {
-                id: Date.now() + Math.random(), // ID único para cada entrada
+                id: Date.now() + Math.random(),
                 value: value,
                 date: new Date().toISOString()
             };
@@ -123,28 +182,30 @@
             data[person].history.push(entry);
             data[person].total += value;
 
-            saveData(); // Removido o await
+            await saveData();
             updateDisplay();
             input.value = '';
+            btn.disabled = false;
             
             showSuccessFeedback(value);
         }
 
-        function deleteEntry(person, entryId) {
+        async function deleteEntry(person, entryId) {
+            if (!confirm('Tem certeza que deseja excluir este depósito?')) {
+                return;
+            }
+
             const entryIndex = data[person].history.findIndex(h => h.id === entryId);
-            
             if (entryIndex === -1) return;
 
             const entry = data[person].history[entryIndex];
             
-            if (confirm(`Tem certeza que deseja excluir o depósito de ${formatCurrency(entry.value)}?`)) {
-                data[person].total -= entry.value;
-                data[person].history.splice(entryIndex, 1);
-                
-                saveData(); // Removido o await
-                updateDisplay();
-                showDeleteFeedback(entry.value);
-            }
+            data[person].total -= entry.value;
+            data[person].history.splice(entryIndex, 1);
+            
+            await saveData();
+            updateDisplay();
+            showDeleteFeedback(entry.value);
         }
 
         function showSuccessFeedback(value) {
@@ -171,6 +232,19 @@
                 feedback.classList.remove('show');
                 setTimeout(() => feedback.remove(), 300);
             }, 2000);
+        }
+
+        function showErrorFeedback(message) {
+            const feedback = document.createElement('div');
+            feedback.className = 'error-feedback';
+            feedback.textContent = `❌ ${message}`;
+            document.body.appendChild(feedback);
+            
+            setTimeout(() => feedback.classList.add('show'), 10);
+            setTimeout(() => {
+                feedback.classList.remove('show');
+                setTimeout(() => feedback.remove(), 300);
+            }, 3000);
         }
 
         function updateDisplay() {
@@ -203,8 +277,10 @@
                             <div class="history-person">${item.name}</div>
                             <div class="history-date">${formatDate(item.date)}</div>
                         </div>
-                        <div class="history-amount">${formatCurrency(item.value)}</div>
-                        <button class="delete-btn" onclick="deleteEntry('${item.person}', ${item.id})">🗑️ Excluir</button>
+                        <div class="history-right">
+                            <div class="history-amount">${formatCurrency(item.value)}</div>
+                            <button class="delete-btn" onclick="deleteEntry('${item.person}', ${item.id})">🗑️</button>
+                        </div>
                     </div>
                 `).join('');
             }
@@ -217,3 +293,6 @@
         document.getElementById('person2Input').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') addValue('person2');
         });
+
+        // Atualiza dados a cada 3000 segundos
+        setInterval(loadData, 3000000);
