@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cofrinho do Casal 💰</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<!-- Tela de Login -->
+    <div class="login-screen" id="loginScreen">
+        <div class="login-card">
+            <h1>🔒 Cofrinho do Casal</h1>
+            <p>Digite a senha para acessar</p>
+            <input type="password" class="login-input" id="passwordInput" placeholder="Senha" autocomplete="off">
+            <button class="login-btn" onclick="checkPassword()">Entrar</button>
+            <div class="login-error" id="loginError">❌ Senha incorreta!</div>
+        </div>
+    </div>
+
+    <!-- App Principal -->
+    <div class="app-screen" id="appScreen">
+    <div class="container">
+        <h1>Cofrinho do Casal</h1>
+
+        <div class="total-section">
+            <h2>Total Acumulado</h2>
+            <div class="total-amount" id="totalAmount">R$ 0,00</div>
+        </div>
+
+        <div class="persons-section">
+            <div class="person-card">
+                <div class="person-header">
+                    <h3>Pedro</h3>
+                    <div class="person-total" id="person1Total">R$ 0,00</div>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="person1Input" placeholder="Valor" step="0.01" min="0" inputmode="decimal">
+                    <button onclick="addValue('person1')">+ Adicionar</button>
+                </div>
+            </div>
+
+            <div class="person-card">
+                <div class="person-header">
+                    <h3>Gabi</h3>
+                    <div class="person-total" id="person2Total">R$ 0,00</div>
+                </div>
+                <div class="input-group">
+                    <input type="number" id="person2Input" placeholder="Valor" step="0.01" min="0" inputmode="decimal">
+                    <button onclick="addValue('person2')">+ Adicionar</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="history-section">
+            <div class="history-header">
+                <h3>📋 Histórico</h3>
+                <span class="history-count" id="historyCount">0 depósitos</span>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="loading">Carregando...</div>
+            </div>
+        </div>
+    </div>
+    </div>
+<script src="script.js"></script>
+</body>
+</html>
